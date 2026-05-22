@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
 
     let app = Router::new().route("/healthz", get(healthz));
 
-    let listener = TcpListener::bind("127.0.0.1:3000").await?;
+    let listener = TcpListener::bind("127.0.0.1:46552").await?;
     info!("holla-relay listening on {}", listener.local_addr()?);
 
     axum::serve(listener, app).await?;
