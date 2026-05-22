@@ -1,0 +1,11 @@
+[package]
+name = "holla-proto"
+version = "0.0.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+uuid.workspace = true
+chrono.workspace = true

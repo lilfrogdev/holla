@@ -1,0 +1,17 @@
+[package]
+name = "holla-cli"
+version = "0.0.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "holla"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+directories.workspace = true
+holla-proto = { path = "../holla-proto", version = "0.0.1" }
+serde_json.workspace = true
