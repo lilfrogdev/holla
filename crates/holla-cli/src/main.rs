@@ -2,7 +2,7 @@ mod store;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use holla_proto::Message;
+use holla_proto::{Message, normalize_room};
 
 #[derive(Debug, Parser)]
 #[command(name = "holla")]
@@ -76,6 +76,7 @@ fn print_paths() -> Result<()> {
 }
 
 fn recv_messages(room_filter: Option<&str>, json: bool) -> Result<()> {
+    let room_filter = room_filter.map(normalize_room);
     let messages = store::read_messages()?;
 
     if messages.is_empty() {
@@ -84,7 +85,7 @@ fn recv_messages(room_filter: Option<&str>, json: bool) -> Result<()> {
     }
 
     for message in messages {
-        if let Some(room_filter) = room_filter
+        if let Some(room_filter) = room_filter.as_deref()
             && message.room != room_filter
         {
             continue;
@@ -94,7 +95,7 @@ fn recv_messages(room_filter: Option<&str>, json: bool) -> Result<()> {
             println!("{}", serde_json::to_string(&message)?);
         } else {
             println!(
-                "[{}] [{}] {}: {}",
+                "[{}] [#{}] {}: {}",
                 message.sent_at, message.room, message.sender, message.body
             );
         }
