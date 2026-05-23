@@ -402,6 +402,9 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "axum",
+ "holla-proto",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

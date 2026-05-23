@@ -24,16 +24,16 @@ impl Default for Config {
     }
 }
 
+pub fn normalize_room(room: impl AsRef<str>) -> String {
+    room.as_ref().trim().trim_start_matches('#').to_string()
+}
+
 impl Message {
-    pub fn new(
-        room: impl Into<String>,
-        sender: impl Into<String>,
-        body: impl Into<String>,
-    ) -> Self {
+    pub fn new(room: impl AsRef<str>, sender: impl Into<String>, body: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4(),
             sent_at: Utc::now(),
-            room: room.into(),
+            room: normalize_room(room),
             sender: sender.into(),
             body: body.into(),
         }

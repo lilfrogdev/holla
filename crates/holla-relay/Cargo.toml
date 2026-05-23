@@ -12,6 +12,9 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+holla-proto = { path = "../holla-proto", version = "0.0.1" }
+serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
