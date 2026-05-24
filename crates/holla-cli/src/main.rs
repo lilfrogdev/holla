@@ -19,6 +19,9 @@ enum Command {
     Send {
         room: String,
         body: String,
+
+        #[arg(long)]
+        relay: Option<String>,
     },
 
     Recv {
@@ -40,7 +43,8 @@ enum DebugCommand {
     Paths,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -48,12 +52,16 @@ fn main() -> Result<()> {
             let path = store::init_config()?;
             println!("Initialized holla config: {}", path.display());
         }
-        Command::Send { room, body } => {
+        Command::Send { room, body, relay } => {
             let config = store::read_config()?;
             let message = Message::new(room, config.default_sender, body);
 
             store::append_message(&message)?;
             println!("{}", serde_json::to_string_pretty(&message)?);
+
+            if let Some(relay) = relay {
+                send_to_relay(&relay, &message).await?;
+            }
         }
         Command::Recv { room, json } => {
             recv_messages(room.as_deref(), json)?;
@@ -100,6 +108,20 @@ fn recv_messages(room_filter: Option<&str>, json: bool) -> Result<()> {
             );
         }
     }
+
+    Ok(())
+}
+
+async fn send_to_relay(relay: &str, message: &Message) -> Result<()> {
+    let url = format!("{}/messages", relay.trim_end_matches('/'));
+
+    let client = reqwest::Client::new();
+    client
+        .post(url)
+        .json(message)
+        .send()
+        .await?
+        .error_for_status()?;
 
     Ok(())
 }
