@@ -2,7 +2,7 @@ mod store;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use holla_proto::{Message, normalize_room, normalize_workspace};
+use holla_proto::{Message, normalize_room, normalize_workspace, parse_destination};
 
 #[derive(Debug, Parser)]
 #[command(name = "holla")]
@@ -17,11 +17,8 @@ enum Command {
     Init,
 
     Send {
-        room: String,
+        destination: String,
         body: String,
-
-        #[arg(long, default_value = "default")]
-        workspace: String,
 
         #[arg(long)]
         relay: Option<String>,
@@ -62,13 +59,18 @@ async fn main() -> Result<()> {
             println!("Initialized holla config: {}", path.display());
         }
         Command::Send {
-            room,
+            destination,
             body,
-            workspace,
             relay,
         } => {
+            let destination = parse_destination(destination);
             let config = store::read_config()?;
-            let message = Message::new(workspace, room, config.default_sender, body);
+            let message = Message::new(
+                destination.workspace,
+                destination.room,
+                config.default_sender,
+                body,
+            );
 
             store::append_message(&message)?;
             println!("{}", serde_json::to_string_pretty(&message)?);
