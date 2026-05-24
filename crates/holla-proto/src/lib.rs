@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub struct Message {
     pub id: Uuid,
     pub sent_at: DateTime<Utc>,
+    pub workspace: String,
     pub room: String,
     pub sender: String,
     pub body: String,
@@ -29,13 +30,29 @@ pub fn normalize_room(room: impl AsRef<str>) -> String {
 }
 
 impl Message {
-    pub fn new(room: impl AsRef<str>, sender: impl Into<String>, body: impl Into<String>) -> Self {
+    pub fn new(
+        workspace: impl AsRef<str>,
+        room: impl AsRef<str>,
+        sender: impl Into<String>,
+        body: impl Into<String>,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             sent_at: Utc::now(),
+            workspace: normalize_workspace(workspace),
             room: normalize_room(room),
             sender: sender.into(),
             body: body.into(),
         }
+    }
+}
+
+pub fn normalize_workspace(workspace: impl AsRef<str>) -> String {
+    let workspace = workspace.as_ref().trim();
+
+    if workspace.is_empty() {
+        "default".to_string()
+    } else {
+        workspace.to_string()
     }
 }

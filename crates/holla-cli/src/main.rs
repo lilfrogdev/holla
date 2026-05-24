@@ -2,7 +2,7 @@ mod store;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use holla_proto::{Message, normalize_room};
+use holla_proto::{Message, normalize_room, normalize_workspace};
 
 #[derive(Debug, Parser)]
 #[command(name = "holla")]
@@ -20,6 +20,9 @@ enum Command {
         room: String,
         body: String,
 
+        #[arg(long, default_value = "default")]
+        workspace: String,
+
         #[arg(long)]
         relay: Option<String>,
     },
@@ -27,6 +30,9 @@ enum Command {
     Recv {
         #[arg(long)]
         room: Option<String>,
+
+        #[arg(long, default_value = "default")]
+        workspace: String,
 
         #[arg(long)]
         json: bool,
@@ -55,9 +61,14 @@ async fn main() -> Result<()> {
             let path = store::init_config()?;
             println!("Initialized holla config: {}", path.display());
         }
-        Command::Send { room, body, relay } => {
+        Command::Send {
+            room,
+            body,
+            workspace,
+            relay,
+        } => {
             let config = store::read_config()?;
-            let message = Message::new(room, config.default_sender, body);
+            let message = Message::new(workspace, room, config.default_sender, body);
 
             store::append_message(&message)?;
             println!("{}", serde_json::to_string_pretty(&message)?);
@@ -66,8 +77,13 @@ async fn main() -> Result<()> {
                 send_to_relay(&relay, &message).await?;
             }
         }
-        Command::Recv { room, json, relay } => {
-            recv_messages(room.as_deref(), json, relay.as_deref()).await?;
+        Command::Recv {
+            room,
+            workspace,
+            json,
+            relay,
+        } => {
+            recv_messages(&workspace, room.as_deref(), json, relay.as_deref()).await?;
         }
         Command::Debug { command } => match command {
             DebugCommand::Paths => {
@@ -86,11 +102,17 @@ fn print_paths() -> Result<()> {
     Ok(())
 }
 
-async fn recv_messages(room_filter: Option<&str>, json: bool, relay: Option<&str>) -> Result<()> {
+async fn recv_messages(
+    workspace_filter: &str,
+    room_filter: Option<&str>,
+    json: bool,
+    relay: Option<&str>,
+) -> Result<()> {
+    let workspace_filter = normalize_workspace(workspace_filter);
     let room_filter = room_filter.map(normalize_room);
 
     let messages = if let Some(relay) = relay {
-        recv_from_relay(relay, room_filter.as_deref()).await?
+        recv_from_relay(relay, &workspace_filter, room_filter.as_deref()).await?
     } else {
         store::read_messages()?
     };
@@ -101,6 +123,10 @@ async fn recv_messages(room_filter: Option<&str>, json: bool, relay: Option<&str
     }
 
     for message in messages {
+        if message.workspace != workspace_filter {
+            continue;
+        }
+
         if let Some(room_filter) = room_filter.as_deref()
             && message.room != room_filter
         {
@@ -111,8 +137,8 @@ async fn recv_messages(room_filter: Option<&str>, json: bool, relay: Option<&str
             println!("{}", serde_json::to_string(&message)?);
         } else {
             println!(
-                "[{}] [#{}] {}: {}",
-                message.sent_at, message.room, message.sender, message.body
+                "[{}] [{}#{}] {}: {}",
+                message.sent_at, message.workspace, message.room, message.sender, message.body
             );
         }
     }
@@ -134,14 +160,18 @@ async fn send_to_relay(relay: &str, message: &Message) -> Result<()> {
     Ok(())
 }
 
-async fn recv_from_relay(relay: &str, room_filter: Option<&str>) -> Result<Vec<Message>> {
+async fn recv_from_relay(
+    relay: &str,
+    workspace_filter: &str,
+    room_filter: Option<&str>,
+) -> Result<Vec<Message>> {
     let base = relay.trim_end_matches('/');
+    let mut url = format!("{base}/messages?workspace={workspace_filter}");
 
-    let url = if let Some(room) = room_filter {
-        format!("{base}/messages?room={room}")
-    } else {
-        format!("{base}/messages")
-    };
+    if let Some(room) = room_filter {
+        url.push_str("&room=");
+        url.push_str(room);
+    }
 
     let client = reqwest::Client::new();
     let messages = client
