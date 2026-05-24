@@ -30,6 +30,9 @@ enum Command {
 
         #[arg(long)]
         json: bool,
+
+        #[arg(long)]
+        relay: Option<String>,
     },
 
     Debug {
@@ -63,8 +66,8 @@ async fn main() -> Result<()> {
                 send_to_relay(&relay, &message).await?;
             }
         }
-        Command::Recv { room, json } => {
-            recv_messages(room.as_deref(), json)?;
+        Command::Recv { room, json, relay } => {
+            recv_messages(room.as_deref(), json, relay.as_deref()).await?;
         }
         Command::Debug { command } => match command {
             DebugCommand::Paths => {
@@ -83,9 +86,14 @@ fn print_paths() -> Result<()> {
     Ok(())
 }
 
-fn recv_messages(room_filter: Option<&str>, json: bool) -> Result<()> {
+async fn recv_messages(room_filter: Option<&str>, json: bool, relay: Option<&str>) -> Result<()> {
     let room_filter = room_filter.map(normalize_room);
-    let messages = store::read_messages()?;
+
+    let messages = if let Some(relay) = relay {
+        recv_from_relay(relay, room_filter.as_deref()).await?
+    } else {
+        store::read_messages()?
+    };
 
     if messages.is_empty() {
         println!("No messages yet.");
@@ -124,4 +132,25 @@ async fn send_to_relay(relay: &str, message: &Message) -> Result<()> {
         .error_for_status()?;
 
     Ok(())
+}
+
+async fn recv_from_relay(relay: &str, room_filter: Option<&str>) -> Result<Vec<Message>> {
+    let base = relay.trim_end_matches('/');
+
+    let url = if let Some(room) = room_filter {
+        format!("{base}/messages?room={room}")
+    } else {
+        format!("{base}/messages")
+    };
+
+    let client = reqwest::Client::new();
+    let messages = client
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<Vec<Message>>()
+        .await?;
+
+    Ok(messages)
 }
