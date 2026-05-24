@@ -4,7 +4,7 @@ use axum::{
     extract::{Query, State},
     routing::get,
 };
-use holla_proto::{Message, normalize_room};
+use holla_proto::{Message, normalize_room, normalize_workspace};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
@@ -18,6 +18,7 @@ struct AppState {
 
 #[derive(Debug, Deserialize)]
 struct ListMessagesQuery {
+    workspace: Option<String>,
     room: Option<String>,
 }
 
@@ -52,15 +53,25 @@ async fn list_messages(
     State(state): State<AppState>,
     Query(query): Query<ListMessagesQuery>,
 ) -> Json<Vec<Message>> {
+    let workspace_filter = query.workspace.map(normalize_workspace);
     let room_filter = query.room.map(normalize_room);
 
     let messages = state.messages.lock().expect("messages mutex poisoned");
 
     let filtered = messages
         .iter()
-        .filter(|message| match room_filter.as_deref() {
-            Some(room) => message.room == room,
-            None => true,
+        .filter(|message| {
+            let workspace_matches = match workspace_filter.as_deref() {
+                Some(workspace) => message.workspace == workspace,
+                None => true,
+            };
+
+            let room_matches = match room_filter.as_deref() {
+                Some(room) => message.room == room,
+                None => true,
+            };
+
+            workspace_matches && room_matches
         })
         .cloned()
         .collect();
@@ -72,6 +83,7 @@ async fn create_message(
     State(state): State<AppState>,
     Json(mut message): Json<Message>,
 ) -> Json<Message> {
+    message.workspace = normalize_workspace(&message.workspace);
     message.room = normalize_room(&message.room);
 
     let mut messages = state.messages.lock().expect("messages mutex poisoned");
