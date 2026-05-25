@@ -4,7 +4,7 @@ use axum::{
     extract::{Query, State},
     routing::get,
 };
-use holla_proto::{Message, normalize_room, normalize_workspace};
+use holla_proto::{Message, RemoteMetadata, normalize_room, normalize_workspace};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
 
     let app = Router::new()
         .route("/healthz", get(healthz))
+        .route("/.well-known/holla-remote", get(remote_metadata))
         .route("/messages", get(list_messages).post(create_message))
         .with_state(state);
 
@@ -47,6 +48,14 @@ async fn main() -> Result<()> {
 
 async fn healthz() -> &'static str {
     "ok"
+}
+
+async fn remote_metadata() -> Json<RemoteMetadata> {
+    Json(RemoteMetadata {
+        slug: "local".to_string(),
+        name: "Local Holla Relay".to_string(),
+        relay_url: "http://127.0.0.1:46552".to_string(),
+    })
 }
 
 async fn list_messages(
