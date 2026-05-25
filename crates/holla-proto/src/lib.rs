@@ -24,6 +24,13 @@ pub struct Destination {
     pub room: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteMetadata {
+    pub slug: String,
+    pub name: String,
+    pub relay_url: String,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
